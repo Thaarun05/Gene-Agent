@@ -2,7 +2,6 @@ import requests
 import os
 import time
 import statistics
-import pprint
 
 # def test_ncbi_connection():
 #     url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -270,11 +269,12 @@ def fetch_uniprot(gene_symbol: str, organism_id: str = "9606") -> dict:
         elif comment_type == "SUBCELLULAR LOCATION":
             locations = comment.get("subcellularLocations", [])
             for loc in locations:
+                location_value = loc.get("location", {}).get("value")
                 subcellular_comments.append({
                     "molecule": molecule,
-                    "location": loc.get("location", {}).get("value"),
+                    "location": location_value,
                     "evidences": loc.get("location", {}).get("evidences", []),
-                    "source_id": f"uniprot:{accession}:subcellular:{molecule}"
+                    "source_id": f"uniprot:{accession}:subcellular:{molecule}:{location_value}"
                 })
 
         elif comment_type == "DISEASE":
@@ -593,6 +593,8 @@ def run_tools_test(gene_symbol: str = "HTT"):
     print(f"\n{'='*60}")
     print(f"TESTING GENE DOSSIER PIPELINE FOR: {gene_symbol}")
     print(f"{'='*60}\n")
+
+    import pprint
 
     # ── 1. NCBI Gene ────────────────────────────────────────────────────────
     print("--- 1. NCBI Gene ---")

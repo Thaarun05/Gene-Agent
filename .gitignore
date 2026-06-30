@@ -1,0 +1,26 @@
+# Environment / secrets — never commit API keys
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Distribution / packaging (in case this ever gets packaged)
+build/
+dist/
+*.egg-info/
