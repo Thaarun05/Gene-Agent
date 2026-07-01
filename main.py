@@ -5,6 +5,7 @@ from src.provenance import (
     flatten_uniprot,
     flatten_list_source,
 )
+from src.agent import run_agent_loop, print_trail
 
 
 def build_dossier_data(gene_symbol: str = "HTT") -> ProvenanceStore | None:
@@ -46,10 +47,25 @@ def build_dossier_data(gene_symbol: str = "HTT") -> ProvenanceStore | None:
     return store
 
 
+def build_dossier_data_agentic(gene_symbol: str = "HTT") -> ProvenanceStore:
+    """
+    Phase 3 agentic version: lets Claude decide which tools to call (and in what
+    order) via the tool-use loop, loading every fact into a fresh ProvenanceStore.
+    Prints the reasoning trail so the agent's decisions can be audited afterward.
+
+    Compare its fact count against build_dossier_data() (the deterministic golden
+    reference) — for HTT both should land around 47 facts.
+    """
+    store = ProvenanceStore()
+    session = run_agent_loop(gene_symbol, store)
+    print_trail(session)
+    return store
+
+
 if __name__ == "__main__":
-    store = build_dossier_data("HTT")
+    store = build_dossier_data_agentic("HTT")
 
     if store:
-        print("Spot check — HD disease comment:")
+        print("\nSpot check — HD disease comment:")
         import pprint
         pprint.pprint(store.get("uniprot:P42858:disease:HD"))
