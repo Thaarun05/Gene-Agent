@@ -27,13 +27,37 @@ class ClaimVerdict:
 
     @property
     def flagged(self) -> bool:
-        # Flagged if it cites something missing or the support check was not a clean yes
-        return bool(self.missing_ids or self.support != "yes")
+        # A real problem: a cited id is missing (hallucination), or the support
+        # check returned something other than a clean "yes". Uncited sentences are
+        # NOT counted here -- they are reported separately (many are harmless lead-ins).
+        return bool(self.missing_ids) or self.support in ("partially", "no")
 
 
 
 # Claim extraction
-_SENTENCE_SPLIT = re.compile(r"(?<=[.?!])\s+")
+# Abbreviations whose trailing period must NOT be treated as a sentence boundary.
+_ABBREVIATIONS = (
+    "et al.", "e.g.", "i.e.", "etc.", "vs.", "cf.", "Fig.", "No.",
+    "approx.", "Dr.", "Inc.", "Ref.",
+)
+# A sentence boundary = .?! then whitespace then an uppercase letter. Requiring an
+# uppercase next char also avoids splitting mid-decimal (e.g. "0.998" has no space).
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.?!])\s+(?=[A-Z])")
+_PROTECT = "\x00"  # stand-in for a period we must not split on
+
+
+def _split_sentences(text: str) -> list[str]:
+    """
+    Split prose into sentences without breaking on common abbreviations
+    ('et al.', 'e.g.', ...) or mid-decimal. Approximate, but far cleaner than a
+    naive period-split: it stops author names like 'Tabrizi et al.' from becoming
+    their own citation-less fragments.
+    """
+    protected = text
+    for abbr in _ABBREVIATIONS:
+        protected = protected.replace(abbr, abbr.replace(".", _PROTECT))
+    sentences = _SENTENCE_BOUNDARY.split(protected)
+    return [s.replace(_PROTECT, ".").strip() for s in sentences if s.strip()]
 
 
 def extract_claims(section) -> list[tuple[str, list[str]]]:
@@ -41,16 +65,13 @@ def extract_claims(section) -> list[tuple[str, list[str]]]:
     Split a section's content into sentence-level claims, attaching cited source_ids.
     Detect cited_ids by substring matching the section's KNOWN source_ids against each
     sentence --> avoids parsing the [source:id] text, because source_ids themselves contain
-    commas, colons, and spaces. 
+    commas, colons, and spaces.
     Sentence segmentation is approximate; that's fine, because flags are advisory
     for human review, never used to auto-edit the dossier.
     """
 
     claims = []
-    for sentence in _SENTENCE_SPLIT.split(section.content):
-        sentence = sentence.strip()
-        if not sentence:
-            continue
+    for sentence in _split_sentences(section.content):
         cited = [source_id for source_id in section.source_ids if source_id in sentence]
         claims.append((sentence, cited))
     return claims
@@ -126,7 +147,7 @@ def verify_dossier(dossier: GeneDossier, store: ProvenanceStore) -> list[ClaimVe
         for claim, cited in extract_claims(section):
             missing = find_missing_ids(cited, store)
             if not cited:
-                support, reason = "unchecked", "no citation in this sentence"
+                support, reason = "uncited", "no [source:id] in this sentence"
             elif missing:
                 support, reason = "unchecked", "cited id(s) not in the store"
             else:
@@ -139,11 +160,24 @@ def verify_dossier(dossier: GeneDossier, store: ProvenanceStore) -> list[ClaimVe
 
 def print_report(verdicts: list[ClaimVerdict]) -> None:
     flagged = [v for v in verdicts if v.flagged]
+    uncited = [v for v in verdicts if not v.cited_ids and not v.flagged]
+    passed = len(verdicts) - len(flagged) - len(uncited)
+
     print(f"\n{'='*60}\nVERIFICATION REPORT\n{'='*60}")
-    print(f"Total claims: {len(verdicts)}  |  Flagged: {len(flagged)}")
-    for v in verdicts:
-        mark = "FLAG" if v.flagged else "ok  "
-        print(f"[{mark}] ({v.section}) support={v.support} missing={v.missing_ids}")
-        if v.flagged:
-            print(f"       claim : {v.claim}")
-            print(f"       reason: {v.reason}")
+    print(
+        f"Total claims: {len(verdicts)}  |  passed: {passed}  |  "
+        f"FLAGGED: {len(flagged)}  |  uncited: {len(uncited)}"
+    )
+
+    if flagged:
+        print("\n--- FLAGGED (needs manual review) ---")
+        for v in flagged:
+            issue = f"missing={v.missing_ids}" if v.missing_ids else f"support={v.support}"
+            print(f"[{v.section}] {issue}")
+            print(f"   claim : {v.claim}")
+            print(f"   reason: {v.reason}")
+
+    if uncited:
+        print("\n--- UNCITED SENTENCES (no [source:id]; often lead-ins, review manually) ---")
+        for v in uncited:
+            print(f"[{v.section}] {v.claim}")
