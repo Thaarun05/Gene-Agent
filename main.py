@@ -6,6 +6,8 @@ from src.provenance import (
     flatten_list_source,
 )
 from src.agent import run_agent_loop, print_trail
+from src.synthesis import synthesize_dossier
+from src.schema import GeneDossier
 
 
 def build_dossier_data(gene_symbol: str = "HTT") -> ProvenanceStore | None:
@@ -62,10 +64,18 @@ def build_dossier_data_agentic(gene_symbol: str = "HTT") -> ProvenanceStore:
     return store
 
 
+def print_dossier(dossier: GeneDossier) -> None:
+    """Pretty-print the synthesized dossier, section by section, with its cited sources."""
+    print(f"\n{'='*60}\nSYNTHESIZED DOSSIER\n{'='*60}")
+    for section_name, section in dossier:
+        print(f"\n--- {section_name.upper()} ---")
+        print(section.content)
+        print(f"  sources: {section.source_ids}")
+
+
 if __name__ == "__main__":
     store = build_dossier_data_agentic("HTT")
 
     if store:
-        print("\nSpot check — HD disease comment:")
-        import pprint
-        pprint.pprint(store.get("uniprot:P42858:disease:HD"))
+        dossier = synthesize_dossier(store, "HTT")
+        print_dossier(dossier)
