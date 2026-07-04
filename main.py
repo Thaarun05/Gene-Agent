@@ -8,6 +8,7 @@ from src.provenance import (
 from src.agent import run_agent_loop, print_trail
 from src.synthesis import synthesize_dossier
 from src.schema import GeneDossier
+from src.verify import verify_dossier, print_report
 
 
 def build_dossier_data(gene_symbol: str = "HTT") -> ProvenanceStore | None:
@@ -79,3 +80,6 @@ if __name__ == "__main__":
     if store:
         dossier = synthesize_dossier(store, "HTT")
         print_dossier(dossier)
+
+        verdicts = verify_dossier(dossier, store)
+        print_report(verdicts)
