@@ -379,9 +379,8 @@ def fetch_proteins_variation(gene_symbol: str, uniprot_accession: str, disease_t
         clinvar_ids = [x.get("id") for x in xrefs if x.get("name") == "ClinVar"]
         dbsnp_ids = [x.get("id") for x in xrefs if x.get("name") == "dbSNP"]
 
-        # pop_freqs = variant.get("populationFrquencies", [])
-
-        variant_id = variant.get("ftId") or variant.get("id") or f"pos_{variant.get('begin')}"
+        clinvar_id = next((x.get("id") for x in xrefs if x.get("name") == "ClinVar"), None)
+        variant_id = variant.get("ftId") or clinvar_id or f"pos_{variant.get('begin')}_{variant.get('end')}"
 
         results.append({
             "source": "variation",

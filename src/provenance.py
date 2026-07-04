@@ -81,7 +81,7 @@ def flatten_list_source(results: list[dict]) -> list[dict]:
 
     facts = []
     for item in results:
-        if item.get("success") and "source_id" in item:
+        if "source_id" in item and item.get("success") is not False:
             facts.append({"source_id": item["source_id"], "content": item})
 
     return facts
